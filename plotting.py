@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import mplhep
 import re
+import matplotlib.dates as mdates
 
 mplhep.style.use("CMS")
 
@@ -31,17 +32,33 @@ def plot_results(run_dir, keys):
             continue
         df_live = pd.read_csv(live_metrics_csv)
         df_live['timestamp'] = pd.to_datetime(df_live['timestamp'])
-        # Plot running clients/servers
-        plt.figure(figsize=(8, 8))
-        plt.plot(df_live['timestamp'], df_live['running_clients'], label='# of clients')
-        plt.plot(df_live['timestamp'], df_live['running_servers'], label='# of Triton servers')
-        plt.xlabel('Time')
-        plt.ylabel('Count')
-        plt.ylim(bottom=0)
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
-        plt.legend()
-        plt.gca().set_aspect('auto', adjustable='box')
-        plt.tight_layout()
+        # Plot running clients/servers on separate subplots sharing x-axis
+        fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(12, 6), gridspec_kw={'height_ratios': [1, 1]})
+        ax1.plot(df_live['timestamp'], df_live['running_clients'], label='Number of clients', color='tab:blue', linewidth=4)
+        # Add 20% headroom to y-axes
+        max_clients = df_live['running_clients'].max() if not df_live['running_clients'].empty else 1
+        ax1.set_ylim(bottom=0, top=max_clients * 1.2)
+        ax1.set_yticks(range(0, int(max_clients) + 1, 2))
+        ax1.grid(axis='y', linestyle='--', alpha=0.7)
+        ax1.legend(loc='upper left')
+        ax2.plot(df_live['timestamp'], df_live['running_servers'], label='Number of Triton servers', color='tab:orange', linewidth=4)
+        ax2.set_xlabel('Time')
+        # Add 20% headroom to y-axes
+        max_servers = df_live['running_servers'].max() if not df_live['running_servers'].empty else 1
+        ax2.set_ylim(bottom=0, top=max_servers * 1.2)
+        ax2.set_yticks(range(0, int(max_servers) + 1, 2))
+        ax2.grid(axis='y', linestyle='--', alpha=0.7)
+        ax2.legend(loc='upper left')
+        # Format x-axis as hh:mm
+        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        # Extend the time axis by an absolute value (custom left/right)
+        if not df_live['timestamp'].empty:
+            t_min = df_live['timestamp'].min()
+            t_max = df_live['timestamp'].max()
+            pad_left = pd.Timedelta(seconds=210)
+            pad_right = pd.Timedelta(seconds=60)
+            ax2.set_xlim(t_min - pad_left, t_max + pad_right)
+        plt.tight_layout(h_pad=0.3)
         plt.savefig(os.path.join(run_dir, f'clients_servers_vs_time_{key}.png'))
         plt.close()
         # Plot latency/gpu vs. time
@@ -63,6 +80,53 @@ def plot_results(run_dir, keys):
         fig.tight_layout()
         fig.axes[0].set_aspect('auto', adjustable='box')
         plt.savefig(os.path.join(run_dir, f'latency_gpu_vs_time_{key}.png'))
+        plt.close()
+        # Additional 4-panel plot: clients, servers, total latency, GPU util
+        fig4, (ax_c, ax_s, ax_l, ax_g) = plt.subplots(4, 1, sharex=True, figsize=(14, 9), gridspec_kw={'height_ratios': [1, 1, 1, 1]})
+        # Number of clients (top)
+        ax_c.plot(df_live['timestamp'], df_live['running_clients'], color='tab:blue', linewidth=4, label='Perf Analyzer Clients')
+        max_clients = df_live['running_clients'].max() if not df_live['running_clients'].empty else 1
+        ax_c.set_ylim(bottom=0, top=max_clients * 1.2)
+        ax_c.set_yticks(range(0, int(max_clients) + 1, 2))
+        ax_c.grid(axis='y', linestyle='--', alpha=0.7)
+        ax_c.grid(axis='x', linestyle=':', alpha=0.5)
+        ax_c.legend(loc='upper left')
+        # Number of servers
+        ax_s.plot(df_live['timestamp'], df_live['running_servers'], color='tab:orange', linewidth=4, label='Triton Servers')
+        max_servers = df_live['running_servers'].max() if not df_live['running_servers'].empty else 1
+        ax_s.set_ylim(bottom=0, top=max_servers * 1.2)
+        ax_s.set_yticks(range(0, int(max_servers) + 1, 2))
+        ax_s.grid(axis='y', linestyle='--', alpha=0.7)
+        ax_s.grid(axis='x', linestyle=':', alpha=0.5)
+        ax_s.legend(loc='upper left')
+        # Total latency
+        ax_l.plot(df_live['timestamp'], df_live['total_latency_ms'], color='tab:green', linewidth=4, label='Total Latency, ms')
+        max_latency = df_live['total_latency_ms'].max() if not df_live['total_latency_ms'].empty else 1
+        ax_l.set_ylim(bottom=0, top=max_latency * 1.2)
+        latency_ticks = 100
+        ax_l.set_yticks([i for i in range(0, int(max_latency) + 1, max(1, latency_ticks // 2))])
+        ax_l.grid(axis='y', linestyle='--', alpha=0.7)
+        ax_l.grid(axis='x', linestyle=':', alpha=0.5)
+        ax_l.legend(loc='upper left')
+        # GPU utilization
+        ax_g.plot(df_live['timestamp'], df_live['gpu_util_percent'], color='tab:purple', linewidth=4, label='Avg. GPU util, %')
+        ax_g.set_ylim(0, 100)
+        ax_g.set_yticks(range(0, 101, 20))
+        ax_g.grid(axis='y', linestyle='--', alpha=0.7)
+        ax_g.grid(axis='x', linestyle=':', alpha=0.5)
+        ax_g.legend(loc='lower left', bbox_to_anchor=(0, -0.15))
+        ax_g.set_xlabel('Time')
+        # Format x-axis as hh:mm
+        ax_g.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        # Extend the time axis by an absolute value (custom left/right)
+        if not df_live['timestamp'].empty:
+            t_min = df_live['timestamp'].min()
+            t_max = df_live['timestamp'].max()
+            pad_left = pd.Timedelta(seconds=600)
+            pad_right = pd.Timedelta(seconds=60)
+            ax_g.set_xlim(t_min - pad_left, t_max + pad_right)
+        plt.tight_layout(h_pad=0.3)
+        plt.savefig(os.path.join(run_dir, f'clients_servers_latency_gpu_vs_time_{key}.png'))
         plt.close()
 
     # 2. Scatter plot: one point per sequence, aggregating all data from that sequence

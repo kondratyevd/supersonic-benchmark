@@ -50,65 +50,65 @@ def run_experiment_sequences(sequences_dict):
 
 if __name__ == "__main__":
     SEQUENCES = {
-        "triton_1server": [
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 1, "request_count": 20000, "restart_servers": True},
-            {"mode": "bare_triton", "n_clients": 10, "n_servers": 1, "request_count": 10000, "restart_servers": False},
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 1, "request_count": 20000, "restart_servers": False},
-        ],
-        "triton_2servers": [
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 2, "request_count": 20000, "restart_servers": True},
-            {"mode": "bare_triton", "n_clients": 10, "n_servers": 2, "request_count": 10000, "restart_servers": False},
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 2, "request_count": 20000, "restart_servers": False},
-        ],
+        # "triton_1server": [
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 1, "request_count": 40000, "restart_servers": True},
+        #     {"mode": "bare_triton", "n_clients": 10, "n_servers": 1, "request_count": 40000, "restart_servers": False},
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 1, "request_count": 40000, "restart_servers": False},
+        # ],
+        # "triton_2servers": [
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 2, "request_count": 40000, "restart_servers": True},
+        #     {"mode": "bare_triton", "n_clients": 10, "n_servers": 2, "request_count": 40000, "restart_servers": False},
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 2, "request_count": 40000, "restart_servers": False},
+        # ],
         "triton_3servers": [
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 3, "request_count": 20000, "restart_servers": True},
-            {"mode": "bare_triton", "n_clients": 10, "n_servers": 3, "request_count": 10000, "restart_servers": False},
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 3, "request_count": 20000, "restart_servers": False},
+            {"mode": "bare_triton", "n_clients": 1, "n_servers": 3, "request_count": 40000, "restart_servers": True},
+            {"mode": "bare_triton", "n_clients": 10, "n_servers": 3, "request_count": 40000, "restart_servers": False},
+            {"mode": "bare_triton", "n_clients": 1, "n_servers": 3, "request_count": 40000, "restart_servers": False},
         ],
-        "triton_4servers": [
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 4, "request_count": 20000, "restart_servers": True},
-            {"mode": "bare_triton", "n_clients": 10, "n_servers": 4, "request_count": 10000, "restart_servers": False},
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 4, "request_count": 20000, "restart_servers": False},
-        ],
-        "triton_5servers": [
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 5, "request_count": 20000, "restart_servers": True},
-            {"mode": "bare_triton", "n_clients": 10, "n_servers": 5, "request_count": 10000, "restart_servers": False},
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 5, "request_count": 20000, "restart_servers": False},
-        ],
-        "triton_6servers": [
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 6, "request_count": 20000, "restart_servers": True},
-            {"mode": "bare_triton", "n_clients": 10, "n_servers": 6, "request_count": 10000, "restart_servers": False},
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 6, "request_count": 20000, "restart_servers": False},
-        ],
-        "triton_7servers": [
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 7, "request_count": 20000, "restart_servers": True},
-            {"mode": "bare_triton", "n_clients": 10, "n_servers": 7, "request_count": 10000, "restart_servers": False},
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 7, "request_count": 20000, "restart_servers": False},
-        ],
-        "triton_8servers": [
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 8, "request_count": 20000, "restart_servers": True},
-            {"mode": "bare_triton", "n_clients": 10, "n_servers": 8, "request_count": 10000, "restart_servers": False},
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 8, "request_count": 20000, "restart_servers": False},
-        ],
-        "triton_9servers": [
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 9, "request_count": 20000, "restart_servers": True},
-            {"mode": "bare_triton", "n_clients": 10, "n_servers": 9, "request_count": 10000, "restart_servers": False},
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 9, "request_count": 20000, "restart_servers": False},
-        ],
-        "triton_10servers": [
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 10, "request_count": 20000, "restart_servers": True},
-            {"mode": "bare_triton", "n_clients": 10, "n_servers": 10, "request_count": 10000, "restart_servers": False},
-            {"mode": "bare_triton", "n_clients": 1, "n_servers": 10, "request_count": 20000, "restart_servers": False},
-        ],
-        "supersonic": [
-            {"mode": "supersonic", "n_clients": 1, "n_servers": 1, "request_count": 20000, "restart_servers": True},
-            {"mode": "supersonic", "n_clients": 10, "n_servers": 1, "request_count": 10000, "restart_servers": False},
-            {"mode": "supersonic", "n_clients": 1, "n_servers": 1, "request_count": 20000, "restart_servers": False},
-        ],
+        # "triton_4servers": [
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 4, "request_count": 40000, "restart_servers": True},
+        #     {"mode": "bare_triton", "n_clients": 10, "n_servers": 4, "request_count": 40000, "restart_servers": False},
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 4, "request_count": 40000, "restart_servers": False},
+        # ],
+        # "triton_5servers": [
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 5, "request_count": 40000, "restart_servers": True},
+        #     {"mode": "bare_triton", "n_clients": 10, "n_servers": 5, "request_count": 40000, "restart_servers": False},
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 5, "request_count": 40000, "restart_servers": False},
+        # ],
+        # "triton_6servers": [
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 6, "request_count": 40000, "restart_servers": True},
+        #     {"mode": "bare_triton", "n_clients": 10, "n_servers": 6, "request_count": 40000, "restart_servers": False},
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 6, "request_count": 40000, "restart_servers": False},
+        # ],
+        # "triton_7servers": [
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 7, "request_count": 40000, "restart_servers": True},
+        #     {"mode": "bare_triton", "n_clients": 10, "n_servers": 7, "request_count": 40000, "restart_servers": False},
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 7, "request_count": 40000, "restart_servers": False},
+        # ],
+        # "triton_8servers": [
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 8, "request_count": 40000, "restart_servers": True},
+        #     {"mode": "bare_triton", "n_clients": 10, "n_servers": 8, "request_count": 40000, "restart_servers": False},
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 8, "request_count": 40000, "restart_servers": False},
+        # ],
+        # "triton_9servers": [
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 9, "request_count": 40000, "restart_servers": True},
+        #     {"mode": "bare_triton", "n_clients": 10, "n_servers": 9, "request_count": 40000, "restart_servers": False},
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 9, "request_count": 40000, "restart_servers": False},
+        # ],
+        # "triton_10servers": [
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 10, "request_count": 40000, "restart_servers": True},
+        #     {"mode": "bare_triton", "n_clients": 10, "n_servers": 10, "request_count": 40000, "restart_servers": False},
+        #     {"mode": "bare_triton", "n_clients": 1, "n_servers": 10, "request_count": 40000, "restart_servers": False},
+        # ],
+        # "supersonic": [
+        #     {"mode": "supersonic", "n_clients": 1, "n_servers": 1, "request_count": 40000, "restart_servers": True},
+        #     {"mode": "supersonic", "n_clients": 10, "n_servers": 1, "request_count": 40000, "restart_servers": False},
+        #     {"mode": "supersonic", "n_clients": 1, "n_servers": 1, "request_count": 40000, "restart_servers": False},
+        # ],
     }
     results_dir, keys = run_experiment_sequences(SEQUENCES)
     plot_results(results_dir, keys)
  
-    # results_dir = "results/multiseq_20250609_213819"
+    # results_dir = "results/multiseq_20250610_172525"
     # keys = ["triton_1server", "triton_2servers", "triton_3servers", "triton_4servers", "triton_5servers", "triton_6servers", "triton_7servers", "triton_8servers", "triton_9servers", "triton_10servers", "supersonic"]
     # plot_results(results_dir, keys) 
