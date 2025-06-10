@@ -82,18 +82,24 @@ def set_service_mode(mode: str):
     else:
         raise ValueError("Mode must be 'supersonic' or 'bare_triton'")
 
-def scale_deployment(name: str, namespace: str, replicas: int, reset: bool = False):
+def scale_deployment(name: str, namespace: str, replicas: int, mode: str, reset: bool = False):
     """
-    Patch the KEDA ScaledObject so that minReplicas and maxReplicas are set to the same value as replicas,
-    then scale the deployment. This disables autoscaling by fixing the replica count.
+    Patch the KEDA ScaledObject:
+    - If mode is 'supersonic', set minReplicaCount=1 and maxReplicaCount=10 (autoscale allowed).
+    - If mode is 'bare_triton', set minReplicaCount=maxReplicaCount=replicas (disable autoscale).
+    Then scale the deployment.
     """
-    # Patch KEDA ScaledObject first
     scaledobject_name = "sonic-server-keda-so"
     group = "keda.sh"
     version = "v1alpha1"
     plural = "scaledobjects"
     try:
-        patch = {"spec": {"minReplicaCount": replicas, "maxReplicaCount": replicas}}
+        if mode == "supersonic":
+            patch = {"spec": {"minReplicaCount": 1, "maxReplicaCount": 10}}
+            print(f"Patched KEDA ScaledObject {scaledobject_name} min/max replicas to 1/10 (supersonic mode)")
+        else:
+            patch = {"spec": {"minReplicaCount": replicas, "maxReplicaCount": replicas}}
+            print(f"Patched KEDA ScaledObject {scaledobject_name} min/max replicas to {replicas} (bare_triton mode)")
         custom_api.patch_namespaced_custom_object(
             group=group,
             version=version,
@@ -102,7 +108,6 @@ def scale_deployment(name: str, namespace: str, replicas: int, reset: bool = Fal
             name=scaledobject_name,
             body=patch
         )
-        print(f"Patched KEDA ScaledObject {scaledobject_name} min/max replicas to {replicas}")
     except Exception as e:
         print(f"Failed to patch KEDA ScaledObject: {e}")
 

@@ -15,7 +15,7 @@ BARE_TRITON_SERVICE   = "sonic-server-triton"
 DEPLOYMENT_NAME       = "sonic-server-triton"
 CONTAINER_IMAGE       = "nvcr.io/nvidia/tritonserver:24.11-py3-sdk"
 CONTAINER_NAME        = "perf-analyzer"
-REQUEST_COUNT         = 5000
+# REQUEST_COUNT is now set per-job in the experiment sequence config (default 5000 if not specified)
 SERVICE_ACCOUNT_NAME  = "hub"   # must have 'list pods' permission
 
 RESOURCES = client.V1ResourceRequirements(
@@ -54,5 +54,5 @@ COLUMNS = [
 
 LIVE_METRICS_COLUMNS = [
     "timestamp", "running_clients", "running_servers",
-    "envoy_overhead", "gpu_util"
+    "envoy_overhead", "gpu_util", "total_latency"
 ] 

@@ -8,9 +8,9 @@ from kubernetes import client
 from datetime import datetime
 from config import (NAMESPACE, SUPRASONIC_SERVICE, BARE_TRITON_SERVICE, JOB_BASE_NAME, CONTAINER_IMAGE, CONTAINER_NAME, REQUEST_COUNT, SERVICE_ACCOUNT_NAME, RESOURCES, METRIC_PATTERNS, COLUMNS)
 from kube_utils import count_running_pods, count_running_servers
-from metrics import query_envoy_overhead, query_gpu_utilization
+from metrics import query_envoy_overhead, query_gpu_utilization, query_total_latency
 
-def log_live_metrics(live_metrics_writer, mode, n_clients, n_servers, running_clients, running_servers, envoy_overhead, gpu_util):
+def log_live_metrics(live_metrics_writer, mode, n_clients, n_servers, running_clients, running_servers, envoy_overhead, gpu_util, total_latency):
     timestamp = datetime.utcnow().isoformat()
     row = {
         "timestamp": timestamp,
@@ -18,10 +18,11 @@ def log_live_metrics(live_metrics_writer, mode, n_clients, n_servers, running_cl
         "running_servers": running_servers,
         "envoy_overhead": envoy_overhead,
         "gpu_util": gpu_util,
+        "total_latency": total_latency,
     }
     live_metrics_writer.writerow(row)
 
-def run_client_job(n_clients: int, mode: str, n_servers: int, live_metrics_writer=None):
+def run_client_job(n_clients: int, mode: str, n_servers: int, live_metrics_writer=None, request_count: int = 5000):
     if mode == "supersonic":
         endpoint_url = f"{SUPRASONIC_SERVICE}.{NAMESPACE}.svc.cluster.local:8001"
     else:
@@ -44,13 +45,18 @@ while true; do
   sleep 2
 done
 
-perf_analyzer -i grpc \
-  -m deepmet -x 1 \
-  -u {endpoint_url} \
-  --async -p 1 \
-  -b 20 \
-  --request-count={REQUEST_COUNT} \
-  --concurrency-range=1 --input-data "random"
+# perf_analyzer -i grpc \
+#   -m deepmet -x 1 \
+#   -u {endpoint_url} \
+#   --async -p 1 \
+#   -b 20 \
+#   --request-count={request_count} \
+#   --concurrency-range=1 --input-data "random"
+
+perf_analyzer -m particlenet_AK4_PT -i grpc -u {endpoint_url} \
+    --async -p 1 -b 100 --concurrency-range 1 \
+    --shape pf_points__0:2,100 --shape pf_features__1:20,100 --shape pf_mask__2:1,100 --shape sv_points__3:2,10 --shape sv_features__4:11,10 --shape sv_mask__5:1,10 \
+    --request-count={request_count}
 '''
     container_args = ["-c", barrier_script]
 
@@ -104,14 +110,23 @@ perf_analyzer -i grpc \
         g_sample = query_gpu_utilization()
         if g_sample is not None and g_sample != 0:
             gpu_samples.append(g_sample)
+        t_sample = query_total_latency()
 
         if live_metrics_writer:
             running_clients = count_running_pods(f"job-name={job_name}", NAMESPACE)
             running_servers = count_running_servers(NAMESPACE)
-            log_live_metrics(
-                live_metrics_writer, mode, n_clients, n_servers,
-                running_clients, running_servers, e_sample, g_sample
-            )
+            if mode == "supersonic":
+                if (e_sample is not None and g_sample is not None and t_sample is not None 
+                    and running_clients is not None and running_servers is not None):
+                    log_live_metrics(
+                        live_metrics_writer, mode, n_clients, n_servers,
+                        running_clients, running_servers, e_sample, g_sample, t_sample
+                    )
+            else:
+                log_live_metrics(
+                    live_metrics_writer, mode, n_clients, n_servers,
+                    running_clients, running_servers, e_sample, g_sample, t_sample
+                )
 
         time.sleep(5)
 
