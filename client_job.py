@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from kubernetes import client
 from datetime import datetime
-from config import (NAMESPACE, SUPRASONIC_SERVICE, BARE_TRITON_SERVICE, JOB_BASE_NAME, CONTAINER_IMAGE, CONTAINER_NAME, REQUEST_COUNT, SERVICE_ACCOUNT_NAME, RESOURCES, METRIC_PATTERNS, COLUMNS)
+from config import (NAMESPACE, SUPRASONIC_SERVICE, BARE_TRITON_SERVICE, JOB_BASE_NAME, CONTAINER_IMAGE, CONTAINER_NAME, SERVICE_ACCOUNT_NAME, RESOURCES, METRIC_PATTERNS, COLUMNS)
 from kube_utils import count_running_pods, count_running_servers
 from metrics import query_envoy_overhead, query_gpu_utilization, query_total_latency
 
