@@ -4,6 +4,16 @@ import matplotlib.pyplot as plt
 import mplhep
 import re
 import matplotlib.dates as mdates
+import seaborn as sns
+from glob import glob
+from datetime import datetime
+import sys
+import warnings
+
+# Add logging
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 mplhep.style.use("CMS")
 
@@ -23,182 +33,209 @@ SEQUENCE_LABELS = {
     # Add more mappings as needed
 }
 
+def safe_read_csv(file_path):
+    """
+    Safely read a CSV file, handling empty files and other errors.
+    Returns None if the file is empty or cannot be read.
+    """
+    try:
+        if not os.path.exists(file_path):
+            return None
+        df = pd.read_csv(file_path)
+        if df.empty:
+            return None
+        return df
+    except pd.errors.EmptyDataError:
+        return None
+    except Exception as e:
+        logger.error(f"Error reading file {file_path}: {e}")
+        return None
 
-def plot_results(run_dir, keys):
-    # 1. For each sequence, plot running number of clients and servers vs. time and latency/gpu vs. time
+def plot_results(results_dir, keys):
+    """
+    Plot results from the benchmark runs.
+    results_dir: directory containing the results
+    keys: list of sequence keys to plot
+    """
+    logger.info(f"Starting to plot results from {results_dir}")
+    logger.info(f"Looking for sequences: {keys}")
+    
+    if not os.path.exists(results_dir):
+        logger.error(f"Results directory does not exist: {results_dir}")
+        sys.exit(1)
+    
+    # Create plots directory
+    plots_dir = os.path.join(results_dir, 'plots')
+    os.makedirs(plots_dir, exist_ok=True)
+    logger.info(f"Created plots directory at {plots_dir}")
+    
+    all_data = []
     for key in keys:
-        live_metrics_csv = os.path.join(run_dir, f'sonic_benchmark_live_metrics_{key}.csv')
-        if not os.path.exists(live_metrics_csv):
+        seq_dir = os.path.join(results_dir, key)
+        if not os.path.exists(seq_dir):
             continue
-        df_live = pd.read_csv(live_metrics_csv)
-        df_live['timestamp'] = pd.to_datetime(df_live['timestamp'])
-        # Plot running clients/servers on separate subplots sharing x-axis
-        fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(12, 6), gridspec_kw={'height_ratios': [1, 1]})
-        ax1.plot(df_live['timestamp'], df_live['running_clients'], label='Number of clients', color='tab:blue', linewidth=4)
-        # Add 20% headroom to y-axes
-        max_clients = df_live['running_clients'].max() if not df_live['running_clients'].empty else 1
-        ax1.set_ylim(bottom=0, top=max_clients * 1.2)
-        ax1.set_yticks(range(0, int(max_clients) + 1, 2))
-        ax1.grid(axis='y', linestyle='--', alpha=0.7)
-        ax1.legend(loc='upper left')
-        ax2.plot(df_live['timestamp'], df_live['running_servers'], label='Number of Triton servers', color='tab:orange', linewidth=4)
-        ax2.set_xlabel('Time')
-        # Add 20% headroom to y-axes
-        max_servers = df_live['running_servers'].max() if not df_live['running_servers'].empty else 1
-        ax2.set_ylim(bottom=0, top=max_servers * 1.2)
-        ax2.set_yticks(range(0, int(max_servers) + 1, 2))
-        ax2.grid(axis='y', linestyle='--', alpha=0.7)
-        ax2.legend(loc='upper left')
-        # Format x-axis as hh:mm
-        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-        # Extend the time axis by an absolute value (custom left/right)
-        if not df_live['timestamp'].empty:
-            t_min = df_live['timestamp'].min()
-            t_max = df_live['timestamp'].max()
-            pad_left = pd.Timedelta(seconds=210)
-            pad_right = pd.Timedelta(seconds=60)
-            ax2.set_xlim(t_min - pad_left, t_max + pad_right)
-        plt.tight_layout(h_pad=0.3)
-        plt.savefig(os.path.join(run_dir, f'clients_servers_vs_time_{key}.png'))
-        plt.close()
-        # Plot latency/gpu vs. time
-        df_live['total_latency_ms'] = pd.to_numeric(df_live['total_latency'], errors='coerce')
-        df_live['gpu_util_percent'] = pd.to_numeric(df_live['gpu_util'], errors='coerce') * 100
-        fig, ax1 = plt.subplots(figsize=(8, 8))
-        color1 = 'tab:blue'
-        color2 = 'tab:orange'
-        ax1.set_xlabel('Time')
-        ax1.set_ylabel('Total Latency (ms)', color=color1)
-        ax1.plot(df_live['timestamp'], df_live['total_latency_ms'], color=color1, label='Total Latency (ms)')
-        ax1.tick_params(axis='y', labelcolor=color1)
-        ax1.set_ylim(bottom=0)
-        ax2 = ax1.twinx()
-        ax2.set_ylabel('GPU Utilization (%)', color=color2)
-        ax2.plot(df_live['timestamp'], df_live['gpu_util_percent'], color=color2, label='GPU Utilization (%)')
-        ax2.tick_params(axis='y', labelcolor=color2)
-        ax2.set_ylim(0, 100)
-        fig.tight_layout()
-        fig.axes[0].set_aspect('auto', adjustable='box')
-        plt.savefig(os.path.join(run_dir, f'latency_gpu_vs_time_{key}.png'))
-        plt.close()
-        # Additional 4-panel plot: clients, servers, total latency, GPU util
-        fig4, (ax_c, ax_s, ax_l, ax_g) = plt.subplots(4, 1, sharex=True, figsize=(14, 9), gridspec_kw={'height_ratios': [1, 1, 1, 1]})
-        # Number of clients (top)
-        ax_c.plot(df_live['timestamp'], df_live['running_clients'], color='tab:blue', linewidth=4, label='Perf Analyzer Clients')
-        max_clients = df_live['running_clients'].max() if not df_live['running_clients'].empty else 1
-        ax_c.set_ylim(bottom=0, top=max_clients * 1.2)
-        ax_c.set_yticks(range(0, int(max_clients) + 1, 2))
-        ax_c.grid(axis='y', linestyle='--', alpha=0.7)
-        ax_c.grid(axis='x', linestyle=':', alpha=0.5)
-        ax_c.legend(loc='upper left')
-        # Number of servers
-        ax_s.plot(df_live['timestamp'], df_live['running_servers'], color='tab:orange', linewidth=4, label='Triton Servers')
-        max_servers = df_live['running_servers'].max() if not df_live['running_servers'].empty else 1
-        ax_s.set_ylim(bottom=0, top=max_servers * 1.2)
-        ax_s.set_yticks(range(0, int(max_servers) + 1, 2))
-        ax_s.grid(axis='y', linestyle='--', alpha=0.7)
-        ax_s.grid(axis='x', linestyle=':', alpha=0.5)
-        ax_s.legend(loc='upper left')
-        # Total latency
-        ax_l.plot(df_live['timestamp'], df_live['total_latency_ms'], color='tab:green', linewidth=4, label='Total Latency, ms')
-        max_latency = df_live['total_latency_ms'].max() if not df_live['total_latency_ms'].empty else 1
-        ax_l.set_ylim(bottom=0, top=max_latency * 1.2)
-        latency_ticks = 100
-        ax_l.set_yticks([i for i in range(0, int(max_latency) + 1, max(1, latency_ticks // 2))])
-        ax_l.grid(axis='y', linestyle='--', alpha=0.7)
-        ax_l.grid(axis='x', linestyle=':', alpha=0.5)
-        ax_l.legend(loc='upper left')
-        # GPU utilization
-        ax_g.plot(df_live['timestamp'], df_live['gpu_util_percent'], color='tab:purple', linewidth=4, label='Avg. GPU util, %')
-        ax_g.set_ylim(0, 100)
-        ax_g.set_yticks(range(0, 101, 20))
-        ax_g.grid(axis='y', linestyle='--', alpha=0.7)
-        ax_g.grid(axis='x', linestyle=':', alpha=0.5)
-        ax_g.legend(loc='lower left', bbox_to_anchor=(0, -0.15))
-        ax_g.set_xlabel('Time')
-        # Format x-axis as hh:mm
-        ax_g.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-        # Extend the time axis by an absolute value (custom left/right)
-        if not df_live['timestamp'].empty:
-            t_min = df_live['timestamp'].min()
-            t_max = df_live['timestamp'].max()
-            pad_left = pd.Timedelta(seconds=600)
-            pad_right = pd.Timedelta(seconds=60)
-            ax_g.set_xlim(t_min - pad_left, t_max + pad_right)
-        plt.tight_layout(h_pad=0.3)
-        plt.savefig(os.path.join(run_dir, f'clients_servers_latency_gpu_vs_time_{key}.png'))
-        plt.close()
-
-    # 2. Scatter plot: one point per sequence, aggregating all data from that sequence
-    agg_rows = []
-    for key in keys:
-        results_csv = os.path.join(run_dir, f'sonic_benchmark_results_{key}.csv')
-        live_metrics_csv = os.path.join(run_dir, f'sonic_benchmark_live_metrics_{key}.csv')
-        if not os.path.exists(results_csv) or not os.path.exists(live_metrics_csv):
+        # No rep_* subdirs, just files
+        rep_results = sorted(glob(os.path.join(seq_dir, 'results_rep*.csv')))
+        rep_live = sorted(glob(os.path.join(seq_dir, 'live_metrics_rep*.csv')))
+        rep_averages = []
+        for results_csv, live_metrics_csv in zip(rep_results, rep_live):
+            df = safe_read_csv(results_csv)
+            df_live = safe_read_csv(live_metrics_csv)
+            if df is not None and not df.empty and df_live is not None and not df_live.empty:
+                rep_avg = {
+                    'sequence': key,
+                    'avg_latency_ms': df['avg_latency_us'].mean() / 1000.0,
+                    'gpu_util_percent': df_live['gpu_util'].mean() * 100
+                }
+                rep_averages.append(rep_avg)
+        if rep_averages:
+            gpu_utils = [r['gpu_util_percent'] for r in rep_averages]
+            print(f"Scatter plot GPU util values for {key}: {gpu_utils}")
+            rep_df = pd.DataFrame(rep_averages)
+            agg_data = {
+                'sequence': key,
+                'avg_latency_ms_mean': rep_df['avg_latency_ms'].mean(),
+                'avg_latency_ms_std': rep_df['avg_latency_ms'].std(),
+                'gpu_util_percent_mean': rep_df['gpu_util_percent'].mean(),
+                'gpu_util_percent_std': rep_df['gpu_util_percent'].std()
+            }
+            all_data.append(agg_data)
+        # For time series, use the new file structure
+        rep_results = sorted(glob(os.path.join(seq_dir, 'results_rep*.csv')))
+        rep_live = sorted(glob(os.path.join(seq_dir, 'live_metrics_rep*.csv')))
+        if not rep_results or not rep_live:
             continue
-        df_results = pd.read_csv(results_csv)
-        if df_results.empty:
-            continue
-        # For GPU util, skip first minute of live metrics
-        df_live = pd.read_csv(live_metrics_csv)
-        df_live['timestamp'] = pd.to_datetime(df_live['timestamp'])
-        if not df_live.empty:
-            t0 = df_live['timestamp'].min()
-            df_live_skip = df_live[df_live['timestamp'] >= t0 + pd.Timedelta(seconds=60)]
-            gpu_util_avg_mean = pd.to_numeric(df_live_skip['gpu_util'], errors='coerce').mean()
-            gpu_util_avg_std = pd.to_numeric(df_live_skip['gpu_util'], errors='coerce').std()
-        else:
-            gpu_util_avg_mean = float('nan')
-            gpu_util_avg_std = float('nan')
-        # Aggregate all data from the sequence for latency
-        avg_latency_us_mean = df_results['avg_latency_us'].mean()
-        avg_latency_us_std = df_results['avg_latency_us'].std()
-        agg_rows.append({
-            'key': key,
-            'label': SEQUENCE_LABELS.get(key, key),
-            'avg_latency_ms': avg_latency_us_mean / 1000.0,
-            'avg_latency_ms_std': avg_latency_us_std / 1000.0,
-            'gpu_util_percent': gpu_util_avg_mean * 100 if pd.notnull(gpu_util_avg_mean) else float('nan'),
-            'gpu_util_percent_std': gpu_util_avg_std * 100 if pd.notnull(gpu_util_avg_std) else float('nan'),
-        })
-    if agg_rows:
-        agg_df = pd.DataFrame(agg_rows)
-        plt.figure(figsize=(8, 8))
-        # Connect the non-SuperSONIC dots in the order of keys
-        normal_ordered = pd.DataFrame([row for row in agg_rows if row['label'] != 'SuperSONIC'])
-        if not normal_ordered.empty:
-            # Use the order of keys for connection
-            normal_ordered['key'] = pd.Categorical(normal_ordered['key'], categories=keys, ordered=True)
-            normal_ordered = normal_ordered.sort_values('key')
-            plt.scatter(
-                normal_ordered['avg_latency_ms'], normal_ordered['gpu_util_percent'],
-                color='tab:blue', label=None
-            )
-            plt.plot(
-                normal_ordered['avg_latency_ms'], normal_ordered['gpu_util_percent'],
-                color='tab:blue', linestyle='-', linewidth=2, alpha=0.7, zorder=2
-            )
-        # Plot SuperSONIC in red if present
-        super_sonic = agg_df[agg_df['label'] == 'SuperSONIC']
-        if not super_sonic.empty:
-            plt.scatter(
-                super_sonic['avg_latency_ms'], super_sonic['gpu_util_percent'],
-                color='tab:red', label='SuperSONIC', zorder=3
-            )
-        axis_labelsize = plt.gca().yaxis.label.get_size()
-        for _, row in agg_df.iterrows():
-            if row['label'] == 'SuperSONIC':
-                color = 'tab:red'
-                plt.annotate(row['label'], (row['avg_latency_ms'], row['gpu_util_percent']),
-                             textcoords="offset points", xytext=(-5, 2), ha='right', va='bottom', fontsize=axis_labelsize * 0.6, color=color)
+        all_timestamps = []
+        fig, axes = plt.subplots(4, 1, figsize=(14, 9), sharex=True, gridspec_kw={'hspace': 0.25})
+        colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:purple']
+        panel_labels = [
+            'Perf. Analyzer Clients',
+            'Triton Servers',
+            'Total Latency, ms',
+            'Avg. GPU util, %'
+        ]
+        # Store all y data for headroom calculation
+        y_data = [[], [], [], []]
+        for live_metrics_csv in rep_live:
+            df = safe_read_csv(live_metrics_csv)
+            if df is not None:
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+                all_timestamps.append(df['timestamp'].min())
+                y_data[0].extend(df['running_clients'])
+                y_data[1].extend(df['running_servers'])
+                y_data[2].extend(df['total_latency'])
+                y_data[3].extend(df['gpu_util'] * 100)
+                axes[0].plot(df['timestamp'], df['running_clients'], color=colors[0], linewidth=4)
+                axes[1].plot(df['timestamp'], df['running_servers'], color=colors[1], linewidth=4)
+                axes[2].plot(df['timestamp'], df['total_latency'], color=colors[2], linewidth=4)
+                axes[3].plot(df['timestamp'], df['gpu_util'] * 100, color=colors[3], linewidth=4)
+        for ax in axes:
+            ax.set_ylabel("")
+        for i, ax in enumerate(axes):
+            ax.legend([panel_labels[i]], loc='upper left', frameon=False)
+        # Set y-axis ranges with 20% headroom except for GPU util
+        for i, ax in enumerate(axes):
+            if i < 3 and y_data[i]:
+                ymax = max(y_data[i])
+                ax.set_ylim(0, ymax * 1.2 if ymax > 0 else 1)
+            elif i == 3:
+                ax.set_ylim(0, 100)
+        axes[3].set_xlabel('Time')
+        axes[3].xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        if all_timestamps:
+            min_time = min(all_timestamps)
+            max_time = max(all_timestamps)
+            total_range = max_time - min_time
+            pad_left = min_time - total_range * 0.75
+            axes[3].set_xlim(left=pad_left)
+        for ax in axes[:-1]:
+            ax.label_outer()
+        for ax in axes:
+            ax.grid(True, alpha=0.5)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            plt.tight_layout()
+        plot_path = os.path.join(plots_dir, f'clients_servers_latency_gpu_vs_time_{key}.png')
+        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        logger.info(f"Saved time series plot to {plot_path}")
+        plt.close()
+    
+    if all_data:
+        logger.info("Creating scatter plots")
+        agg_df = pd.DataFrame(all_data)
+        plt.figure(figsize=(10, 10))
+        # Define colors
+        triton_color = 'tab:blue'
+        supersonic_color = 'tab:red'
+        # Collect bare-triton points for line connection
+        triton_points = []
+        for idx, row in agg_df.iterrows():
+            if row['sequence'].startswith('triton_'):
+                color = triton_color
+                triton_points.append((row['avg_latency_ms_mean'], row['gpu_util_percent_mean']))
+            elif row['sequence'] == 'supersonic':
+                color = supersonic_color
             else:
-                color = 'tab:blue'
-                plt.annotate(row['label'], (row['avg_latency_ms'], row['gpu_util_percent']),
-                             textcoords="offset points", xytext=(6, -4), ha='left', va='top', fontsize=axis_labelsize * 0.6, color=color)
+                color = 'gray'
+            plt.errorbar(
+                row['avg_latency_ms_mean'],
+                row['gpu_util_percent_mean'],
+                xerr=row['avg_latency_ms_std'],
+                yerr=row['gpu_util_percent_std'],
+                fmt='o',
+                color=color,
+                capsize=5,
+                markersize=8,
+                linewidth=2
+            )
+            tick_fontsize = plt.gca().xaxis.get_ticklabels()[0].get_fontsize() if plt.gca().xaxis.get_ticklabels() else 12
+            label_text = SEQUENCE_LABELS.get(row['sequence'], row['sequence'])
+            plt.annotate(
+                label_text,
+                (row['avg_latency_ms_mean'], row['gpu_util_percent_mean']),
+                textcoords="offset points", xytext=(5,5), ha='left', fontsize=tick_fontsize
+            )
+        # Sort triton points by latency for line connection
+        if triton_points:
+            triton_points = sorted(triton_points, key=lambda x: x[0])
+            plt.plot(
+                [p[0] for p in triton_points],
+                [p[1] for p in triton_points],
+                color=triton_color,
+                linewidth=2,
+                zorder=1
+            )
         plt.xlabel('Average Latency (ms)')
         plt.ylabel('Average GPU Utilization (%)')
-        plt.xlim(left=0, right=agg_df['avg_latency_ms'].max() * 1.2 if not agg_df['avg_latency_ms'].empty else None)
         plt.ylim(0, 100)
+        if not agg_df['avg_latency_ms_mean'].empty:
+            xmax = agg_df['avg_latency_ms_mean'].max() * 1.2
+            plt.xlim(left=0, right=xmax)
+        plt.grid(True, alpha=0.3)
+        # No legend
         plt.tight_layout()
-        plt.savefig(os.path.join(run_dir, 'latency_vs_gpu_scatter.png'))
-        plt.close() 
+        plot_path = os.path.join(plots_dir, 'gpu_vs_latency_scatter.png')
+        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        logger.info(f"Saved GPU util vs latency scatter plot to {plot_path}")
+        plt.close()
+    else:
+        logger.warning("No data found for scatter plots")
+
+if __name__ == "__main__":
+    # Get the most recent results directory
+    results_dirs = sorted(glob("results/multiseq_*"))
+    if not results_dirs:
+        logger.error("No results directories found")
+        sys.exit(1)
+    
+    latest_results = results_dirs[-1]
+    logger.info(f"Using latest results directory: {latest_results}")
+    
+    # Define the sequences to plot
+    keys = [
+        'triton_1server', 'triton_2servers', 'triton_3servers', 'triton_4servers',
+        'triton_5servers', 'triton_6servers', 'triton_7servers', 'triton_8servers',
+        'triton_9servers', 'triton_10servers', 'supersonic'
+    ]
+    
+    plot_results(latest_results, keys) 

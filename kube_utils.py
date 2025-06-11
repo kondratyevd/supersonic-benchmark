@@ -109,7 +109,9 @@ def scale_deployment(name: str, namespace: str, replicas: int, mode: str, reset:
             body=patch
         )
     except Exception as e:
+        import traceback
         print(f"Failed to patch KEDA ScaledObject: {e}")
+        traceback.print_exc()
 
     if reset:
         patch_zero = {"spec": {"replicas": 0}}
@@ -136,4 +138,41 @@ def count_running_pods(label_selector: str, namespace: str) -> int:
 
 def count_running_servers(namespace: str) -> int:
     pods = core_api.list_namespaced_pod(namespace=namespace, label_selector="app.kubernetes.io/component=triton").items
-    return sum(1 for pod in pods if pod.status.phase == "Running") 
+    return sum(1 for pod in pods if pod.status.phase == "Running")
+
+def cleanup_benchmark_jobs(namespace="cms"):
+    """Delete all existing benchmark-related jobs and pods"""
+    batch_v1 = client.BatchV1Api()
+    v1 = client.CoreV1Api()
+    
+    # Delete jobs with our label
+    try:
+        jobs = batch_v1.list_namespaced_job(
+            namespace=namespace,
+            label_selector="app=sonic-benchmark"
+        )
+        for job in jobs.items:
+            print(f"Deleting existing job: {job.metadata.name}")
+            batch_v1.delete_namespaced_job(
+                name=job.metadata.name,
+                namespace=namespace,
+                body=client.V1DeleteOptions(propagation_policy="Background")
+            )
+    except Exception as e:
+        print(f"Error cleaning up jobs: {e}")
+    
+    # Delete pods that might be stuck
+    try:
+        pods = v1.list_namespaced_pod(
+            namespace=namespace,
+            label_selector="app=sonic-benchmark"
+        )
+        for pod in pods.items:
+            print(f"Deleting existing pod: {pod.metadata.name}")
+            v1.delete_namespaced_pod(
+                name=pod.metadata.name,
+                namespace=namespace,
+                body=client.V1DeleteOptions(propagation_policy="Background")
+            )
+    except Exception as e:
+        print(f"Error cleaning up pods: {e}") 

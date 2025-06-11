@@ -9,7 +9,7 @@ import numpy as np
 from kubernetes import client
 
 NAMESPACE             = "cms"
-JOB_BASE_NAME         = "sonic-benchmark"
+JOB_BASE_NAME         = "sonic-benchmark-client"
 SUPRASONIC_SERVICE    = "sonic-server"
 BARE_TRITON_SERVICE   = "sonic-server-triton"
 DEPLOYMENT_NAME       = "sonic-server-triton"
