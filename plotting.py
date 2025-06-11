@@ -159,20 +159,22 @@ def plot_results(results_dir, keys):
         plt.savefig(plot_path, dpi=300, bbox_inches='tight')
         logger.info(f"Saved time series plot to {plot_path}")
         plt.close()
-    
+
     if all_data:
         logger.info("Creating scatter plots")
         agg_df = pd.DataFrame(all_data)
+        # --- GPU vs Latency ---
         plt.figure(figsize=(10, 10))
-        # Define colors
         triton_color = 'tab:blue'
         supersonic_color = 'tab:red'
-        # Collect bare-triton points for line connection
         triton_points = []
         for idx, row in agg_df.iterrows():
             if row['sequence'].startswith('triton_'):
+                # Extract number of servers from key, e.g., 'triton_1server' -> 1
+                match = re.search(r'triton_(\d+)', row['sequence'])
+                n_servers = int(match.group(1)) if match else 0
                 color = triton_color
-                triton_points.append((row['avg_latency_ms_mean'], row['gpu_util_percent_mean']))
+                triton_points.append((n_servers, row['avg_latency_ms_mean'], row['gpu_util_percent_mean']))
             elif row['sequence'] == 'supersonic':
                 color = supersonic_color
             else:
@@ -193,14 +195,14 @@ def plot_results(results_dir, keys):
             plt.annotate(
                 label_text,
                 (row['avg_latency_ms_mean'], row['gpu_util_percent_mean']),
-                textcoords="offset points", xytext=(5,5), ha='left', fontsize=tick_fontsize
+                textcoords="offset points", xytext=(8,-24), ha='left', fontsize=tick_fontsize
             )
-        # Sort triton points by latency for line connection
         if triton_points:
+            # Sort by number of servers (first element)
             triton_points = sorted(triton_points, key=lambda x: x[0])
             plt.plot(
-                [p[0] for p in triton_points],
-                [p[1] for p in triton_points],
+                [p[1] for p in triton_points],  # avg_latency_ms_mean
+                [p[2] for p in triton_points],  # gpu_util_percent_mean
                 color=triton_color,
                 linewidth=2,
                 zorder=1
@@ -212,7 +214,6 @@ def plot_results(results_dir, keys):
             xmax = agg_df['avg_latency_ms_mean'].max() * 1.2
             plt.xlim(left=0, right=xmax)
         plt.grid(True, alpha=0.3)
-        # No legend
         plt.tight_layout()
         plot_path = os.path.join(plots_dir, 'gpu_vs_latency_scatter.png')
         plt.savefig(plot_path, dpi=300, bbox_inches='tight')
