@@ -9,10 +9,11 @@ from client_job import run_client_job
 from datetime import datetime
 from plotting import plot_results
 
-def run_experiment_sequences(sequences_dict, repetitions=1):
+def run_experiment_sequences(sequences_dict, repetitions=1, start=0):
     """
     sequences_dict: dict of {key: sequence_list}
     repetitions: number of times to repeat each sequence
+    start: starting repetition index (default 0)
     Returns: (run_dir, list of keys)
     """
     timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
@@ -28,7 +29,7 @@ def run_experiment_sequences(sequences_dict, repetitions=1):
     for key, experiment_sequence in sequences_dict.items():
         seq_dir = os.path.join(run_dir, key)
         # Run the sequence multiple times
-        for rep in range(repetitions):
+        for rep in range(start, start + repetitions):
             # New file paths (no rep_N subdir)
             output_csv = os.path.join(seq_dir, f'results_rep{rep}.csv')
             live_metrics_csv = os.path.join(seq_dir, f'live_metrics_rep{rep}.csv')
@@ -64,6 +65,10 @@ def run_experiment_sequences(sequences_dict, repetitions=1):
     return run_dir, keys
 
 if __name__ == "__main__":
+    # Set these constants to control repetitions and starting index
+    REPETITIONS = 2  # Number of repetitions
+    START = 3        # Starting repetition index
+
     SEQUENCES = {
         "triton_1server": [
             {"mode": "bare_triton", "n_clients": 1, "n_servers": 1, "request_count": 10000, "restart_servers": True},
@@ -121,10 +126,10 @@ if __name__ == "__main__":
             {"mode": "supersonic", "n_clients": 1, "n_servers": 1, "request_count": 10000, "restart_servers": False},
         ],
     }
-    results_dir, keys = run_experiment_sequences(SEQUENCES, repetitions=3)  # Run each sequence 3 times
+    results_dir, keys = run_experiment_sequences(SEQUENCES, repetitions=REPETITIONS, start=START)
     plot_results(results_dir, keys)
  
     # results_dir = "/work/users/dkondra/sonic-benchmark/results/multiseq_20250611_031705"
-    # results_dir = "results/multiseq_20250611_141604"
+    # results_dir = "results/multiseq_20250611_143922"
     # keys = ["triton_1server", "triton_2servers", "triton_3servers", "triton_4servers", "triton_5servers", "triton_6servers", "triton_7servers", "triton_8servers", "triton_9servers", "triton_10servers", "supersonic"]
     # plot_results(results_dir, keys) 
