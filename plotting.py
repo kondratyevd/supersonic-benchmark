@@ -195,7 +195,8 @@ def plot_results(results_dir, keys):
             plt.annotate(
                 label_text,
                 (row['avg_latency_ms_mean'], row['gpu_util_percent_mean']),
-                textcoords="offset points", xytext=(8,-24), ha='left', fontsize=tick_fontsize
+                textcoords="offset points", xytext=(8,-24), ha='left', fontsize=tick_fontsize,
+                color=color
             )
         if triton_points:
             # Sort by number of servers (first element)
