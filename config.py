@@ -10,9 +10,9 @@ from kubernetes import client
 
 NAMESPACE             = "cms"
 JOB_BASE_NAME         = "sonic-benchmark-client"
-SUPRASONIC_SERVICE    = "sonic-server"
-BARE_TRITON_SERVICE   = "sonic-server-triton"
-DEPLOYMENT_NAME       = "sonic-server-triton"
+SUPERSONIC_SERVICE    = "sonic-interlink"
+BARE_TRITON_SERVICE   = "sonic-interlink-triton"
+DEPLOYMENT_NAME       = "sonic-interlink-triton"
 CONTAINER_IMAGE       = "nvcr.io/nvidia/tritonserver:24.11-py3-sdk"
 CONTAINER_NAME        = "perf-analyzer"
 # REQUEST_COUNT is now set per-job in the experiment sequence config (default 5000 if not specified)

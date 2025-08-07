@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from kubernetes import client
 from datetime import datetime
-from config import (NAMESPACE, SUPRASONIC_SERVICE, BARE_TRITON_SERVICE, JOB_BASE_NAME, CONTAINER_IMAGE, CONTAINER_NAME, SERVICE_ACCOUNT_NAME, RESOURCES, METRIC_PATTERNS, COLUMNS)
+from config import (NAMESPACE, SUPERSONIC_SERVICE, BARE_TRITON_SERVICE, JOB_BASE_NAME, CONTAINER_IMAGE, CONTAINER_NAME, SERVICE_ACCOUNT_NAME, RESOURCES, METRIC_PATTERNS, COLUMNS)
 from kube_utils import count_running_pods, count_running_servers
 from metrics import query_envoy_overhead, query_gpu_utilization, query_total_latency
 
@@ -24,7 +24,7 @@ def log_live_metrics(live_metrics_writer, mode, n_clients, n_servers, running_cl
 
 def run_client_job(n_clients: int, mode: str, n_servers: int, live_metrics_writer=None, request_count: int = 5000):
     if mode == "supersonic":
-        endpoint_url = f"{SUPRASONIC_SERVICE}.{NAMESPACE}.svc.cluster.local:8001"
+        endpoint_url = f"{SUPERSONIC_SERVICE}.{NAMESPACE}.svc.cluster.local:8001"
     else:
         endpoint_url = f"{BARE_TRITON_SERVICE}.{NAMESPACE}.geddes.rcac.purdue.edu:8001"
 

@@ -6,10 +6,11 @@ import subprocess
 from datetime import datetime
 
 # Constants
-POD_NAME = "sonic-benchmark-hztkr"  # Replace with your pod name
+POD_NAME = "purdue-af-1"  # Replace with your pod name
 NAMESPACE = "cms"
 RESULTS_BASE = "/work/users/dkondra/sonic-benchmark/results"
-SPECIFIC_RESULTS_DIR = "/work/users/dkondra/sonic-benchmark/results/multiseq_20250611_141604"  # Set to a specific directory path if needed
+# SPECIFIC_RESULTS_DIR = "/work/users/dkondra/sonic-benchmark/results/multiseq_20250611_143922"
+SPECIFIC_RESULTS_DIR = "/work/users/dkondra/sonic-benchmark/results/multiseq_20250612_132332"
 
 def download_results():
     """

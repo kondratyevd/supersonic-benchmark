@@ -1,7 +1,7 @@
 # Kubernetes utility functions for the benchmark
 import time
 from kubernetes import client
-from config import NAMESPACE, BARE_TRITON_SERVICE, DEPLOYMENT_NAME, POLL_INTERVAL_SECONDS
+from config import NAMESPACE, BARE_TRITON_SERVICE, DEPLOYMENT_NAME, POLL_INTERVAL_SECONDS, SUPERSONIC_SERVICE
 
 core_api = client.CoreV1Api()
 apps_v1 = client.AppsV1Api()
@@ -22,7 +22,7 @@ def create_headless_service():
         namespace=NAMESPACE,
         labels={
             "app.kubernetes.io/component": "triton",
-            "app.kubernetes.io/instance": "sonic-server",
+            "app.kubernetes.io/instance": SUPERSONIC_SERVICE,
             "app.kubernetes.io/name": "supersonic",
             "scrape_metrics": "true"
         },
@@ -32,7 +32,7 @@ def create_headless_service():
         type="ClusterIP",
         selector={
             "app.kubernetes.io/component": "triton",
-            "app.kubernetes.io/instance": "sonic-server",
+            "app.kubernetes.io/instance": SUPERSONIC_SERVICE,
             "app.kubernetes.io/name": "supersonic",
         },
         ports=[
@@ -51,7 +51,7 @@ def create_loadbalancer_service():
         namespace=NAMESPACE,
         labels={
             "app.kubernetes.io/component": "triton",
-            "app.kubernetes.io/instance": "sonic-server",
+            "app.kubernetes.io/instance": SUPERSONIC_SERVICE,
             "app.kubernetes.io/name": "supersonic",
             "scrape_metrics": "true"
         },
@@ -60,7 +60,7 @@ def create_loadbalancer_service():
         type="LoadBalancer",
         selector={
             "app.kubernetes.io/component": "triton",
-            "app.kubernetes.io/instance": "sonic-server",
+            "app.kubernetes.io/instance": SUPERSONIC_SERVICE,
             "app.kubernetes.io/name": "supersonic",
         },
         ports=[
@@ -89,7 +89,7 @@ def scale_deployment(name: str, namespace: str, replicas: int, mode: str, reset:
     - If mode is 'bare_triton', set minReplicaCount=maxReplicaCount=replicas (disable autoscale).
     Then scale the deployment.
     """
-    scaledobject_name = "sonic-server-keda-so"
+    scaledobject_name = f"{SUPERSONIC_SERVICE}-keda-so"
     group = "keda.sh"
     version = "v1alpha1"
     plural = "scaledobjects"
@@ -138,7 +138,7 @@ def count_running_pods(label_selector: str, namespace: str) -> int:
 
 def count_running_servers(namespace: str) -> int:
     pods = core_api.list_namespaced_pod(namespace=namespace, label_selector="app.kubernetes.io/component=triton").items
-    return sum(1 for pod in pods if pod.status.phase == "Running")
+    return sum(1 for pod in pods if pod.status.phase == "Running") 
 
 def cleanup_benchmark_jobs(namespace="cms"):
     """Delete all existing benchmark-related jobs and pods"""

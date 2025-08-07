@@ -1,19 +1,23 @@
 # Metrics and Prometheus querying functions for the benchmark
 import requests
 import numpy as np
-from config import PROMETHEUS_URL
+from config import PROMETHEUS_URL, DEPLOYMENT_NAME
 
 def query_envoy_overhead() -> float or None:
     query = (
-        'sum by (pod)(('
-        'increase(envoy_http_downstream_rq_time_sum{release="sonic-server",envoy_http_conn_manager_prefix="ingress_grpc"}[30s])'
-        ' / '
-        'increase(envoy_http_downstream_rq_time_count{release="sonic-server",envoy_http_conn_manager_prefix="ingress_grpc"}[30s])'
-        ')) - sum by (pod)(('
-        'increase(envoy_cluster_upstream_rq_time_sum{release="sonic-server"}[30s])'
-        ' / '
-        'increase(envoy_cluster_upstream_rq_time_count{release="sonic-server"}[30s])'
-        '))'
+        (
+            'sum by (pod)('
+            'increase(envoy_http_downstream_rq_time_sum{release="' + str(DEPLOYMENT_NAME) + '",envoy_http_conn_manager_prefix="ingress_grpc"}[30s])'
+            ' / '
+            'increase(envoy_http_downstream_rq_time_count{release="' + str(DEPLOYMENT_NAME) + '",envoy_http_conn_manager_prefix="ingress_grpc"}[30s])'
+            ')'
+            ' - '
+            'sum by (pod)('
+            'increase(envoy_cluster_upstream_rq_time_sum{release="' + str(DEPLOYMENT_NAME) + '"}[30s])'
+            ' / '
+            'increase(envoy_cluster_upstream_rq_time_count{release="' + str(DEPLOYMENT_NAME) + '"}[30s])'
+            ')'
+        )
     )
     response = requests.get(PROMETHEUS_URL, params={"query": query}, verify=True)
     response.raise_for_status()
@@ -47,11 +51,13 @@ def query_gpu_utilization() -> float or None:
 
 def query_total_latency() -> float or None:
     query = (
-        'sum by (pod)('
-        'increase(envoy_http_downstream_rq_time_sum{release="sonic-server",envoy_http_conn_manager_prefix="ingress_grpc"}[30s])'
-        ' / '
-        'increase(envoy_http_downstream_rq_time_count{release="sonic-server",envoy_http_conn_manager_prefix="ingress_grpc"}[30s])'
-        ')'
+        (
+            'sum by (pod)('
+            'increase(envoy_http_downstream_rq_time_sum{release="' + str(DEPLOYMENT_NAME) + '",envoy_http_conn_manager_prefix="ingress_grpc"}[30s])'
+            ' / '
+            'increase(envoy_http_downstream_rq_time_count{release="' + str(DEPLOYMENT_NAME) + '",envoy_http_conn_manager_prefix="ingress_grpc"}[30s])'
+            ')'
+        )
     )
     response = requests.get(PROMETHEUS_URL, params={"query": query}, verify=True)
     response.raise_for_status()

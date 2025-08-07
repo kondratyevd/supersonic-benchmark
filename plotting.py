@@ -6,9 +6,11 @@ import re
 import matplotlib.dates as mdates
 import seaborn as sns
 from glob import glob
-from datetime import datetime
+from datetime import datetime, timedelta
 import sys
 import warnings
+from matplotlib.lines import Line2D
+import matplotlib.ticker as mticker
 
 # Add logging
 import logging
@@ -23,7 +25,7 @@ SEQUENCE_LABELS = {
     'triton_2servers': '2 GPUs',
     'triton_3servers': '3 GPUs',
     'triton_4servers': '4 GPUs',
-    'triton_5servers': '5',
+    'triton_5servers': '5 GPUs',
     'triton_6servers': '6',
     'triton_7servers': '7',
     'triton_8servers': '8',
@@ -32,6 +34,17 @@ SEQUENCE_LABELS = {
     'supersonic': 'SuperSONIC',
     # Add more mappings as needed
 }
+
+LABEL_OFFSETS = {
+    'triton_6servers': (20, -10),
+    'triton_7servers': (-19, 6),
+    'triton_8servers': (8, -22),
+    'triton_9servers': (-20, 8),
+    'triton_10servers': (5, -22),
+    'supersonic': (9, 12),
+}
+
+DEFAULT_OFFSET = (8, -20)
 
 def safe_read_csv(file_path):
     """
@@ -110,9 +123,9 @@ def plot_results(results_dir, keys):
         colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:purple']
         panel_labels = [
             'Perf. Analyzer Clients',
-            'Triton Servers',
+            'Triton Inference Servers\n(1 GPU per server)',
             'Total Latency, ms',
-            'Avg. GPU util, %'
+            'Avg. GPU utilization, %'
         ]
         # Store all y data for headroom calculation
         y_data = [[], [], [], []]
@@ -131,9 +144,13 @@ def plot_results(results_dir, keys):
                 axes[3].plot(df['timestamp'], df['gpu_util'] * 100, color=colors[3], linewidth=4)
         for ax in axes:
             ax.set_ylabel("")
+        panel_bins = [3, 4, 3, 4]
         for i, ax in enumerate(axes):
-            ax.legend([panel_labels[i]], loc='upper left', frameon=False)
-        # Set y-axis ranges with 20% headroom except for GPU util
+            if i == 3:
+                ax.legend([panel_labels[i]], loc='lower left', bbox_to_anchor=(0, -0.10), frameon=False)
+            else:
+                ax.legend([panel_labels[i]], loc='upper left', frameon=False)
+            ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=panel_bins[i], prune=None))
         for i, ax in enumerate(axes):
             if i < 3 and y_data[i]:
                 ymax = max(y_data[i])
@@ -145,18 +162,21 @@ def plot_results(results_dir, keys):
         if all_timestamps:
             min_time = min(all_timestamps)
             max_time = max(all_timestamps)
-            total_range = max_time - min_time
-            pad_left = min_time - total_range * 0.75
+            # Add 30 minutes of padding to the left
+            pad_left = min_time - timedelta(minutes=7)
             axes[3].set_xlim(left=pad_left)
         for ax in axes[:-1]:
             ax.label_outer()
         for ax in axes:
-            ax.grid(True, alpha=0.5)
+            ax.grid(True, alpha=0.7, linewidth=1.2)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             plt.tight_layout()
         plot_path = os.path.join(plots_dir, f'clients_servers_latency_gpu_vs_time_{key}.png')
         plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        # Also save as PDF
+        plot_path_pdf = os.path.splitext(plot_path)[0] + '.pdf'
+        plt.savefig(plot_path_pdf, bbox_inches='tight')
         logger.info(f"Saved time series plot to {plot_path}")
         plt.close()
 
@@ -164,60 +184,154 @@ def plot_results(results_dir, keys):
         logger.info("Creating scatter plots")
         agg_df = pd.DataFrame(all_data)
         # --- GPU vs Latency ---
-        plt.figure(figsize=(10, 10))
+        plt.figure(figsize=(10, 8))
         triton_color = 'tab:blue'
         supersonic_color = 'tab:red'
         triton_points = []
+        supersonic_coords = None
         for idx, row in agg_df.iterrows():
             if row['sequence'].startswith('triton_'):
-                # Extract number of servers from key, e.g., 'triton_1server' -> 1
                 match = re.search(r'triton_(\d+)', row['sequence'])
                 n_servers = int(match.group(1)) if match else 0
                 color = triton_color
                 triton_points.append((n_servers, row['avg_latency_ms_mean'], row['gpu_util_percent_mean']))
+                plt.errorbar(
+                    row['avg_latency_ms_mean'],
+                    row['gpu_util_percent_mean'],
+                    xerr=row['avg_latency_ms_std'],
+                    yerr=row['gpu_util_percent_std'],
+                    fmt='o',
+                    color=color,
+                    capsize=5,
+                    markersize=8,
+                    linewidth=2,
+                    label=None
+                )
+                tick_fontsize = plt.gca().xaxis.get_ticklabels()[0].get_fontsize() if plt.gca().xaxis.get_ticklabels() else 12
+                label_text = SEQUENCE_LABELS.get(row['sequence'], row['sequence'])
+                offset = LABEL_OFFSETS.get(row['sequence'], DEFAULT_OFFSET)
+                plt.annotate(
+                    label_text,
+                    (row['avg_latency_ms_mean'], row['gpu_util_percent_mean']),
+                    textcoords="offset points", xytext=offset, ha='left', fontsize=tick_fontsize*0.9,
+                    color=color
+                )
             elif row['sequence'] == 'supersonic':
                 color = supersonic_color
+                supersonic_coords = (row['avg_latency_ms_mean'], row['gpu_util_percent_mean'],
+                                     row['avg_latency_ms_std'], row['gpu_util_percent_std'])
+                plt.errorbar(
+                    row['avg_latency_ms_mean'],
+                    row['gpu_util_percent_mean'],
+                    xerr=row['avg_latency_ms_std'],
+                    yerr=row['gpu_util_percent_std'],
+                    fmt='o',
+                    color=color,
+                    capsize=5,
+                    markersize=8,
+                    linewidth=2,
+                    label=None
+                )
+                # Add annotation for SuperSONIC point
+                tick_fontsize = plt.gca().xaxis.get_ticklabels()[0].get_fontsize() if plt.gca().xaxis.get_ticklabels() else 12
+                label_text = SEQUENCE_LABELS.get(row['sequence'], row['sequence'])
+                # Make SuperSONIC label multi-line
+                if row['sequence'] == 'supersonic':
+                    # label_text = 'SuperSONIC\nautoscaling\n1 – 6 GPUs'
+                    label_text = 'SuperSONIC'
+                offset = LABEL_OFFSETS.get(row['sequence'], DEFAULT_OFFSET)
+                plt.annotate(
+                    label_text,
+                    (row['avg_latency_ms_mean'], row['gpu_util_percent_mean']),
+                    textcoords="offset points", xytext=offset, ha='left', fontsize=tick_fontsize*0.9,
+                    color=color
+                )
             else:
                 color = 'gray'
-            plt.errorbar(
-                row['avg_latency_ms_mean'],
-                row['gpu_util_percent_mean'],
-                xerr=row['avg_latency_ms_std'],
-                yerr=row['gpu_util_percent_std'],
-                fmt='o',
-                color=color,
-                capsize=5,
-                markersize=8,
-                linewidth=2
-            )
-            tick_fontsize = plt.gca().xaxis.get_ticklabels()[0].get_fontsize() if plt.gca().xaxis.get_ticklabels() else 12
-            label_text = SEQUENCE_LABELS.get(row['sequence'], row['sequence'])
-            plt.annotate(
-                label_text,
-                (row['avg_latency_ms_mean'], row['gpu_util_percent_mean']),
-                textcoords="offset points", xytext=(8,-24), ha='left', fontsize=tick_fontsize,
-                color=color
-            )
-        if triton_points:
-            # Sort by number of servers (first element)
-            triton_points = sorted(triton_points, key=lambda x: x[0])
-            plt.plot(
-                [p[1] for p in triton_points],  # avg_latency_ms_mean
-                [p[2] for p in triton_points],  # gpu_util_percent_mean
-                color=triton_color,
-                linewidth=2,
-                zorder=1
-            )
-        plt.xlabel('Average Latency (ms)')
-        plt.ylabel('Average GPU Utilization (%)')
+                plt.errorbar(
+                    row['avg_latency_ms_mean'],
+                    row['gpu_util_percent_mean'],
+                    xerr=row['avg_latency_ms_std'],
+                    yerr=row['gpu_util_percent_std'],
+                    fmt='o',
+                    color=color,
+                    capsize=5,
+                    markersize=8,
+                    linewidth=2,
+                    label=None
+                )
+                tick_fontsize = plt.gca().xaxis.get_ticklabels()[0].get_fontsize() if plt.gca().xaxis.get_ticklabels() else 12
+                label_text = SEQUENCE_LABELS.get(row['sequence'], row['sequence'])
+                offset = LABEL_OFFSETS.get(row['sequence'], DEFAULT_OFFSET)
+                plt.annotate(
+                    label_text,
+                    (row['avg_latency_ms_mean'], row['gpu_util_percent_mean']),
+                    textcoords="offset points", xytext=offset, ha='left', fontsize=tick_fontsize*0.9,
+                    color=color
+                )
+        super_line = None
+        if supersonic_coords is not None:
+            # Draw a horizontal line at the SuperSONIC y value (for legend only)
+            super_line = Line2D([0], [0], color=supersonic_color, linewidth=2)
+        # Custom legend: only lines
+        legend_handles = []
+        legend_labels = []
+        # Always add Triton legend entry
+        legend_handles.append(Line2D([0], [0], color=triton_color, linewidth=2, marker='o', markersize=8))
+        legend_labels.append('Fixed number of Triton Inference Servers')
+        if super_line is not None:
+            legend_handles.append(Line2D([0], [0], color=supersonic_color, linewidth=2, marker='o', markersize=8))
+            legend_labels.append('SuperSONIC with load-based autoscaling')
+        plt.xlabel('Average Latency, ms')
+        plt.ylabel('Average GPU Utilization, %')
         plt.ylim(0, 100)
         if not agg_df['avg_latency_ms_mean'].empty:
             xmax = agg_df['avg_latency_ms_mean'].max() * 1.2
             plt.xlim(left=0, right=xmax)
-        plt.grid(True, alpha=0.3)
+        plt.grid(True, alpha=0.7, linewidth=1.2)
+        if legend_handles:
+            # Use the same font size as point labels
+            plt.legend(legend_handles, legend_labels, loc='lower left', fontsize=tick_fontsize*0.9)
+        # Add 'better' arrow annotation (arrow only) and text to the lower left of midpoint
+        ax = plt.gca()
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        x_arrow_start = xlim[0] + (xlim[1] - xlim[0]) * 0.20
+        y_arrow_start = ylim[0] + (ylim[1] - ylim[0]) * 0.54
+        x_arrow_tip = xlim[0] + (xlim[1] - xlim[0]) * 0.1
+        y_arrow_tip = ylim[0] + (ylim[1] - ylim[0]) * 0.75
+        # Draw only the arrow
+        plt.annotate(
+            "",
+            xy=(x_arrow_tip, y_arrow_tip),
+            xytext=(x_arrow_start, y_arrow_start),
+            textcoords='data',
+            arrowprops=dict(
+                arrowstyle='-|>',
+                color='#bbbbbb',
+                lw=8,
+                mutation_scale=18,
+                capstyle='butt',
+                joinstyle='miter',
+            )
+        )
+        # Place the label to the lower left of the midpoint
+        x_range = xlim[1] - xlim[0]
+        y_range = ylim[1] - ylim[0]
+        label_x = (x_arrow_tip + x_arrow_start) / 2 - 0.09 * x_range
+        label_y = (y_arrow_tip + y_arrow_start) / 2 - 0.06 * y_range
+        plt.text(
+            label_x, label_y, "better",
+            ha='left', va='bottom',
+            fontsize=tick_fontsize*0.95,
+            color='#888888'
+        )
         plt.tight_layout()
         plot_path = os.path.join(plots_dir, 'gpu_vs_latency_scatter.png')
         plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        # Also save as PDF
+        plot_path_pdf = os.path.splitext(plot_path)[0] + '.pdf'
+        plt.savefig(plot_path_pdf, bbox_inches='tight')
         logger.info(f"Saved GPU util vs latency scatter plot to {plot_path}")
         plt.close()
     else:
